@@ -89,6 +89,11 @@ found:
   p->state = EMBRYO;
   p->pid = nextpid++;
 
+  // track ticks
+  p->ctime = ticks;
+  p->rtime = 0;
+  
+  
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -343,6 +348,8 @@ scheduler(void)
       switchuvm(p);
       p->state = RUNNING;
 
+	  cprintf(" %s with pid %d is running\n", p->name, p->pid);
+	  
       swtch(&(c->scheduler), p->context);
       switchkvm();
 
