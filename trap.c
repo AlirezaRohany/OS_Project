@@ -110,4 +110,19 @@ trap(struct trapframe *tf)
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
     exit();
+
+ #ifdef RR //default schedule
+ 
+  // force process to give up CPU after clock tick.
+ if(myproc() && myproc()->state == RUNNING &&
+     tf->trapno == T_IRQ0+IRQ_TIMER)
+    yield();
+	
+if(myproc() && myproc()->state == RUNNING && tf->trapno == T_IRQ0+IRQ_TIMER && increment_sched_tickcounter() == QUANTA)
+    yield();
+ #endif 
+ 
+ //check process after yield 
+if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
+  exit();
 }

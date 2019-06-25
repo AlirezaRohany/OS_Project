@@ -52,7 +52,8 @@ struct proc {
   // new items
   int ctime;                   
   int rtime;                   
-  int etime;                   
+  int etime;        
+  int sched_tick_c;  			//to handle timesliceing  
 };
 
 // Process memory is laid out contiguously, low addresses first:
@@ -62,3 +63,4 @@ struct proc {
 //   expandable heap
 
 void updateStats();
+int tickcounter(); 

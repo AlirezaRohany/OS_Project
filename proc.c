@@ -555,7 +555,7 @@ void updateStats() {
   release(&ptable.lock);
 } 
 
-int increment_sched_tickcounter()
+int tickcounter()
 {
   int returnMe;
   acquire(&ptable.lock); // crititcal section to use the process table
