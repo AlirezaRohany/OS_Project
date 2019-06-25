@@ -92,7 +92,7 @@ found:
   // track ticks
   p->ctime = ticks;
   p->rtime = 0;
-  
+  p->sched_tick_c = 0;
   
   release(&ptable.lock);
 
@@ -394,6 +394,7 @@ yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
   myproc()->state = RUNNABLE;
+  myproc()->sched_tick_c = 0; //added line
   sched();
   release(&ptable.lock);
 }
@@ -552,4 +553,13 @@ void updateStats() {
     }
   }
   release(&ptable.lock);
+} 
+
+int increment_sched_tickcounter()
+{
+  int returnMe;
+  acquire(&ptable.lock); // crititcal section to use the process table
+  returnMe = ++myproc()->sched_tick_c;
+  release(&ptable.lock);
+  return returnMe;
 } 
