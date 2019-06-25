@@ -20,13 +20,110 @@ extern void trapret(void);
 
 static void wakeup1(void *chan);
 
+struct procLog
+{
+  int pid;
+  char name[16];
+  int ctime;
+  int rtime;
+  int etime;
+};
+
+struct procLog log[NPROC];
+
+#ifdef RR
+int sched_option = 1; // RR
+#endif
+
+#ifdef GRT
+int sched_option = 100;
+#endif
+
+#ifdef QQQ
+int sched_option = 1000;
+#endif
+
+#ifdef NBF
+int boot_first = 0;
+#else
+int boot_first = 1;
+#endif
+
+
+
+#ifdef FRR
+
+// create a queue of pids
+
+int sched_option = 10;
+
+int queue[NPROC];
+int head_index = -1;
+int tail_index = -1;
+
+
+int queue_size()
+{
+  if(tail_index >= head_index)
+    return tail_index - head_index;
+  else
+    return NPROC - (head_index - tail_index);
+}
+
+int q_contains(int proc_id)
+{
+  int q_size = queue_size();
+  for(int i = 0; i < q_size; i++)
+  {
+    if(proc_id == queue[(head_index + i) % NPROC]){
+      return (head_index + i) % NPROC;
+    }
+  }
+  return -1;
+}
+
+void print_queue()
+{
+  int size = queue_size();
+
+
+  cprintf("\n");
+  for(int i = 0; i < size; i++)
+    cprintf("<%d> ", queue[(head_index + i) % NPROC]);
+  cprintf("\n");
+}
+
+void push_a_proc(int proc_id, int print) // look for instances where a proc was made runnable and push them to queue insted
+{
+  if(0 < q_contains(proc_id)) // if process exists
+    return;
+  
+  tail_index = (tail_index + 1) % NPROC;
+  queue[tail_index] = proc_id;
+  if(print > 0)
+    print_queue();
+}
+
+int pop_a_proc(void)  // change a proc state to running
+{
+  // cprintf("poping\t\t");
+  print_queue();
+  head_index = (head_index + 1) % NPROC;
+  return queue[head_index];
+}
+
+
+#endif
+
+
+
 void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
 }
 
-// Must be called with interrupts disabled
+// called with interrupts disabled
 int
 cpuid() {
   return mycpu()-cpus;
