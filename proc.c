@@ -116,6 +116,79 @@ int pop_a_proc(void)  // change a proc state to running
 #endif
 
 
+#ifdef QQQ
+
+
+int queue[NPROC];
+int head_index = -1;
+int tail_index = -1;
+
+int queue_size()
+{
+  if(tail_index >= head_index)
+    return tail_index - head_index;
+  else
+    return NPROC - (head_index - tail_index);
+}
+
+int q_contains(int proc_id)
+{
+  int q_size = queue_size();
+  for(int i = 0; i < q_size; i++)
+  {
+    if(proc_id == queue[(head_index + i) % NPROC]){
+      return (head_index + i) % NPROC;
+    }
+  }
+  return -1;
+}
+
+void print_queue()
+{
+  int size = queue_size();
+
+  cprintf("\n");
+  for(int i = 0; i < size; i++)
+    cprintf("<%d> ", queue[(head_index + i) % NPROC]);
+  cprintf("\n");
+}
+
+void push_a_proc(int proc_id, int print) 
+{
+  if(0 < q_contains(proc_id)) // if process exists
+    return;
+  
+  tail_index = (tail_index + 1) % NPROC;
+  queue[tail_index] = proc_id;
+  if(print > 0)
+    print_queue();
+}
+
+int pop_a_proc(void)  
+{
+  print_queue();
+  head_index = (head_index + 1) % NPROC;
+  return queue[head_index];
+}
+
+int remove(int pid)
+{
+  int found_index = q_contains(pid); 
+  if( found_index >= 0)
+  {
+
+  }
+  else
+  {
+    cprintf("pid is not in queue: %d", pid);
+    return -1;
+  }
+  
+  return 1;
+}
+
+#endif
+
 
 void
 pinit(void)
