@@ -305,6 +305,7 @@ userinit(void)
     panic("userinit: out of memory?");
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
   p->sz = PGSIZE;
+  p->priority = HIGH;
   memset(p->tf, 0, sizeof(*p->tf));
   p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
@@ -325,6 +326,11 @@ userinit(void)
 
   p->state = RUNNABLE;
 
+    #ifdef FRR
+	// defenition new scheduling
+    push_a_proc(p->pid, 1);
+    
+	#endif
   release(&ptable.lock);
 }
 
@@ -377,6 +383,7 @@ fork(void)
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
+  np->priority = curproc->priority;
 
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
@@ -390,6 +397,10 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
+  
+  #ifdef FRR
+    push_a_proc(np->pid, 1);
+  #endif
 
   release(&ptable.lock);
 
@@ -404,6 +415,7 @@ exit(void)
 {
   struct proc *curproc = myproc();
   struct proc *p;
+  struct procLog l;
   int fd;
 
   if(curproc == initproc)
@@ -421,7 +433,8 @@ exit(void)
   iput(curproc->cwd);
   end_op();
   curproc->cwd = 0;
-
+  // we consider here is the end of process
+  curproc->etime = ticks;
   acquire(&ptable.lock);
 
   // Parent might be sleeping in wait().
