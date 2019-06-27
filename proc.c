@@ -571,8 +571,138 @@ int performance_recording(int *wtime, int *rtime)
   }
 
 }
-/* /start of prformance recording */
+/* /end of prformance recording */
 
+void RR_policy(struct proc *p, struct cpu *c)
+{
+      
+  // Loop over prWocess table looking for process to run.
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if(p->state != RUNNABLE)
+      continue;
+
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+    
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+
+    // time priod finished.
+    c->proc = 0;
+  }
+}
+
+void FRR_policy(struct proc *p, struct cpu *c)
+{
+  #ifdef FRR
+  //same as RR
+  int this_turn_proc_id;
+
+
+  if(tail_index != head_index) // if queue is not empty  
+  {
+    this_turn_proc_id = pop_a_proc();
+  }
+  else
+  { 
+    return;
+  }
+  // loop over proc table to find chosen process
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if(p->state != RUNNABLE)
+      continue;
+
+    if(p->pid != this_turn_proc_id)
+      continue;
+
+	/* switching should happen in the way that
+	process release ptable.lock */
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+
+    
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+
+	//same as RR 
+    c->proc = 0;
+  }
+  #endif
+  return;
+}
+void GRT_policy(struct proc *p, struct cpu *c)
+{
+  #ifdef GRT
+
+  struct proc *process_selection = 0;
+  int min_share = 100000;
+
+  // Loop over process table looking for process to run.
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if(p->state == RUNNABLE)
+      if(process_selection != 0)
+      {
+        // find share
+        int number_to_divide = ticks - p->ctime;
+        int share = 100000000; 
+        if(0 != number_to_divide) 
+          share = p->rtime / number_to_divide;
+        if(share < min_share)
+        {
+          min_share = share;
+          process_selection = p;
+        }
+      }
+      else
+        process_selection = p;
+    else
+    {
+      continue;
+    }
+  }
+  // process found
+  if(process_selection != 0)
+  {
+    p = process_selection;
+
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+    
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+
+    // same as RR
+    c->proc = 0;
+  }
+  #endif
+
+  // if nothing was defined just return :) or just by reaching the end
+  return;
+}
+
+int find_high_priority(void)
+{
+    struct proc *p;
+
+    // acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    {
+        if(p->state != RUNNABLE)
+            continue;
+        if(p->priority == HIGH)
+        {
+            cprintf("process with highest priority %d, %s\n", p->pid, stringFromPriority(p->priority));
+            return 1;
+        }
+    }
+    return -1;
+}
 
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
