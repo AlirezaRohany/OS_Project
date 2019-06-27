@@ -435,6 +435,19 @@ exit(void)
   curproc->cwd = 0;
   // we consider here is the end of process
   curproc->etime = ticks;
+  
+  /* saving dead process */
+  l.pid = curproc->pid;
+  int c_count;
+  for(c_count = 0; c_count < 16; c_count++) // simplest way to copy a string as a char array
+    l.name[c_count] = curproc->name[c_count];
+  l.rtime = curproc->rtime;
+  l.etime = curproc->etime;
+  l.ctime = curproc->ctime;
+  log[curproc->pid] = l;
+  /* /saving dead process */
+  
+  
   acquire(&ptable.lock);
 
   // Parent might be sleeping in wait().
@@ -477,12 +490,16 @@ wait(void)
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
+		p->priority = LOW;
         freevm(p->pgdir);
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
+		p->etime = 0;
+        p->rtime = 0;
+        p->ctime = 0;
         release(&ptable.lock);
         return pid;
       }
@@ -498,6 +515,64 @@ wait(void)
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
   }
 }
+
+/* start of prformance recording */
+int performance_recording(int *wtime, int *rtime)
+{
+  // copy wait() here and then add some code to fill out pointers
+
+  struct proc *p;
+  int havekids, pid;
+  struct proc *curproc = myproc();
+  
+  acquire(&ptable.lock);
+  for(;;){
+    // Scan through table looking for exited children.
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->parent != curproc)
+        continue;
+      havekids = 1;
+      if(p->state == ZOMBIE){
+        // Found one.
+        // my additions to wait to get performance data
+        *rtime = p->rtime; // value of rtime is now rtime of p
+        *wtime = p->etime - p->rtime - p->ctime; // wait time is end time - create time - run time  
+        //
+        pid = p->pid;
+        kfree(p->kstack);
+        p->kstack = 0;
+        freevm(p->pgdir);
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        p->state = UNUSED;
+        // this function clears the page table
+        // this should have been the reason for ps showing the last end time :)
+        p->etime = 0;
+        p->rtime = 0;
+        p->ctime = 0;
+        // reset to low
+        p->priority = LOW;
+        release(&ptable.lock);
+        return pid;
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+  }
+
+}
+/* /start of prformance recording */
+
 
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
