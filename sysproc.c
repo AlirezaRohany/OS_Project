@@ -77,8 +77,7 @@ sys_sleep(void)
   return 0;
 }
 
-// return how many clock tick interrupts have occurred
-// since start.
+// count interupts from start
 int
 sys_uptime(void)
 {
@@ -88,4 +87,21 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+int sys_performance_recording(void)
+{
+  int *wtime, *rtime;
+
+  if (argptr(0, (void*)&wtime, sizeof(wtime)) < 0)
+    return -1;
+  if (argptr(1, (void*)&rtime, sizeof(rtime)) < 0)
+    return -1;
+
+  return performance_recording(wtime, rtime);
+}
+
+int sys_nice()
+{
+  return nice(myproc()->pid);
 }

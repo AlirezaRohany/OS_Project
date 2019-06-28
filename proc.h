@@ -33,6 +33,7 @@ struct context {
 };
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+enum proc_priority { HIGH, MID, LOW};
 
 // Per-process state
 struct proc {
@@ -56,6 +57,17 @@ struct proc {
   int sched_tick_c;  			//to handle timesliceing  
 };
 
+static inline char *stringFromState(enum procstate p){
+  
+  static char *strings[] = { "UNUSED", "EMBRYO", "SLEEPING", "RUNNABLE", "RUNNING", "ZOMBIE" };
+  return strings[p];
+}
+
+static inline char *stringFromPriority(enum proc_priority p){
+  
+  static char *strings[] = { "HIGH", "MID", "LOW" };
+  return strings[p];
+}
 // Process memory is laid out contiguously, low addresses first:
 //   text
 //   original data and bss

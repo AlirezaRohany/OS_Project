@@ -81,7 +81,10 @@ argstr(int n, char **pp)
     return -1;
   return fetchstr(addr, pp);
 }
-
+extern int sys_getppid(void); // my addition
+extern int sys_cps(void); // addition for prj2
+extern int sys_wait_and_performance(void);
+extern int sys_nice(void);
 extern int sys_chdir(void);
 extern int sys_close(void);
 extern int sys_dup(void);
@@ -126,6 +129,9 @@ static int (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_getppid] sys_getppid, // used in previouse project :))
+[SYS_wait_and_performance]  sys_wait_and_performance, 
+[SYS_nice] sys_nice,
 };
 
 void

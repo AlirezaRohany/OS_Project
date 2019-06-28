@@ -120,7 +120,8 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
-
+int             performance_recording(int *wtime, int *rtime);
+int             nice(int);
 // swtch.S
 void            swtch(struct context**, struct context*);
 
