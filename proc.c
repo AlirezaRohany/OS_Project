@@ -263,6 +263,7 @@ found:
   p->ctime = ticks;
   p->rtime = 0;
   p->sched_tick_c = 0;
+  p->priority = HIGH;
   
   release(&ptable.lock);
 
@@ -720,10 +721,10 @@ scheduler(void)
   c->proc = 0;
   
   for(;;){
-    // Enable interrupts on this processor.
+    // interupts defined
     sti();
 
-    #ifdef FRR // dont know why but for some reason i need this or we will get a dead lock
+    #ifdef FRR 
           if(tail_index == head_index)
           {
             acquire(&ptable.lock);
@@ -755,10 +756,146 @@ scheduler(void)
     // as seen in all policies
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
 
+      if(nextpid < 4 && boot_first == 1)
+      {
+
+          // Loop over process table looking for process to run.
+          for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+          {
+              if(p->state != RUNNABLE)
+                  continue;
+
+              
+              c->proc = p;
+              switchuvm(p);
+              p->state = RUNNING;
+
+              cprintf("bootup process %s with pid %d is now running\n", p->name, p->pid);
+              // ... ... ...
+
+              swtch(&(c->scheduler), p->context);
+              switchkvm();
+
+              // Process is done running for now.
+              // It should have changed its p->state before coming back.
+              c->proc = 0;
+          }
+      }
+      else
+      {
+          switch (sched_option)
+          {
+              case 1: // RR
+                  RR_policy(p, c);
+                  break;
+
+              case 10:
+                  FRR_policy(p, c);
+                  break;
+
+              case 100:
+                  GRT_policy(p, c);
+                  break;
+
+              case 1000:
+                  // i fear that some dont change their priorty and we get stuck
+        #ifdef QQQ
+                          // check if there is any process with high priority
+              if(check_high_p_exists() >= 0)
+              {
+                //todo: make it cleaner
+                //for now its just a copy of GRT
+                struct proc *minP = 0;
+                int min_share = 10000000;
+
+                for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+                {
+                  // check if priority is high
+                  if(p->state == RUNNABLE && p->priority == HIGH)
+                    if(minP != 0)
+                    {
+                      int divide_to = ticks - p->ctime;
+                      int share = 1000000000;
+                      if(0 != divide_to)
+                        share = p->rtime / divide_to;
+                      if(share < min_share)
+                      {
+                        min_share = share;
+                        minP = p;
+                      }
+                    }
+                    else
+                      minP = p;
+                  else
+                  {
+                    continue;
+                  }
+                }
+                if(minP != 0)
+                {
+                  p = minP;
+
+                  c->proc = p;
+                  switchuvm(p);
+                  p->state = RUNNING;
+
+                  swtch(&(c->scheduler), p->context);
+                  switchkvm();
+
+                  c->proc = 0;
+                }
+              }
+              else if (head_index != tail_index)
+              {
+                int this_turn_proc_id = pop_a_proc();
+
+                // loop over proc table to find chosen process
+
+                for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+                {
+                  if(p->state != RUNNABLE)
+                    continue;
+
+                  if(p->pid != this_turn_proc_id)
+                    continue;
+
+                  c->proc = p;
+                  switchuvm(p);
+                  p->state = RUNNING;
+
+                  swtch(&(c->scheduler), p->context);
+                  switchkvm();
+
+                  c->proc = 0;
+                }
+              }
+              else
+              {
+                for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+                {
+                  if(p->state != RUNNABLE)
+                    continue;
+
+                  c->proc = p;
+                  switchuvm(p);
+                  p->state = RUNNING;
+
+                  swtch(&(c->scheduler), p->context);
+                  switchkvm();
+
+                  c->proc = 0;
+                }
+              }
+        #endif
+                  break;
+              // previous loop never happens
+//        for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+//          if(p->state != RUNNABLE)
+//            continue;
+            default:
+                break;
+        }
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
@@ -809,6 +946,13 @@ yield(void)
   acquire(&ptable.lock);  //DOC: yieldlock
   myproc()->state = RUNNABLE;
   myproc()->sched_tick_c = 0; //added line
+  #ifdef FRR
+    push_a_proc(myproc()->pid, 1);
+  #endif
+  #ifdef QQQ
+    if(myproc()->priority == MID)
+      push_a_proc(myproc()->pid, 1);
+  #endif
   sched();
   release(&ptable.lock);
 }
@@ -882,8 +1026,18 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan){
       p->state = RUNNABLE;
+	  p->state = RUNNABLE;
+	  //wakeup for processes added here
+      #ifdef FRR
+      push_a_proc(p->pid, -1); 
+      #endif
+      #ifdef QQQ
+      if(p->priority == MID)
+        push_a_proc(p->pid, -1);
+      #endif
+	}
 }
 
 // Wake up all processes sleeping on chan.
@@ -908,8 +1062,13 @@ kill(int pid)
     if(p->pid == pid){
       p->killed = 1;
       // Wake process from sleep if necessary.
-      if(p->state == SLEEPING)
+      if(p->state == SLEEPING){
         p->state = RUNNABLE;
+		// lines for sched
+		#ifdef FRR
+        push_a_proc(p->pid, 1);
+        #endif
+	  }
       release(&ptable.lock);
       return 0;
     }
